@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema(
   {
@@ -6,15 +6,16 @@ const userSchema = new mongoose.Schema(
     deviceId: String, // profile.id,
     userLink: String, // profile.id,
     advertiserTrackingId: String,
+    affiliateLink: String,
+
     role: {
       type: String,
-      default: 'User', // "User" and "Admin"
+      default: "User", // "User" and "Admin"
       // default:
     },
-  
   },
   { timestamps: true }
 );
 
-const User = mongoose.model('User', userSchema);
+const User = mongoose.model("User", userSchema);
 module.exports = User;

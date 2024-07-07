@@ -182,12 +182,15 @@ const getKeitaroSecondLinkWithUser = async (
   req,
   url,
   advertiser_tracking_id,
-  userData
+  ip
 ) => {
   console.log({ url, advertiser_tracking_id });
   let link = "";
 
-  const userExists = userData;
+  const userExists = await User.findOne({ ipAddress: ip });
+  const userTrackingIdExists = await User.findOne({
+    advertiserTrackingId: advertiser_tracking_id,
+  });
 
   try {
     // Forward the request to Server 2
@@ -214,9 +217,18 @@ const getKeitaroSecondLinkWithUser = async (
           stage4: "sending keitaro campaign 2 link with params if available",
         });
 
-        if (userExists && userExists.affiliateLink) {
+        let linkWithAdvertiserId = ""
+        let linkDirect = ""
+
+        if (userTrackingIdExists && userTrackingIdExists.affiliateLink) {
+          let linkWithAdvertiserId = link
+          linkWithAdvertiserId = link + `${userTrackingIdExists?.affiliateLink}`; // adding affiliate link
+        } else if (userExists && userExists.affiliateLink) {
+          linkDirect  = link + `${userExists?.affiliateLink}`; // adding affiliate link
+        } else {
           link = link + `${userExists?.affiliateLink}`; // adding affiliate link
         }
+        // return link;
       } else {
         console.log({
           stage5: "return non https value but html for other countries",
@@ -378,13 +390,14 @@ app.get("/", async (req, res) => {
       let updated_advertiser_tracking_id = advertiser_tracking_id
         ? advertiser_tracking_id
         : "";
-      const userData = updatedUser;
+
       facebookLink = await getKeitaroSecondLinkWithUser(
         req,
         keitaroFirstCampaign,
         updated_advertiser_tracking_id,
-        userData
+        ip
       );
+      // facebookLink = userExists.userLink;
     }
   } else if (userTrackingIdExists) {
     console.log("user exists");
@@ -392,26 +405,27 @@ app.get("/", async (req, res) => {
       ? advertiser_tracking_id
       : "";
 
-    const userData = userTrackingIdExists;
     facebookLink = await getKeitaroSecondLinkWithUser(
       req,
       keitaroFirstCampaign,
       updated_advertiser_tracking_id,
-      userData
+      ip
     );
+    // facebookLink = userTrackingIdExists.userLink;
     console.log("app launch successful");
     console.log({ marketerLink: facebookLink });
   } else {
     console.log("user exists");
+    // facebookLink = userExists?.userLink ? userExists?.userLink : backend;
     let updated_advertiser_tracking_id = advertiser_tracking_id
       ? advertiser_tracking_id
       : "";
-    const userData = userExists;
+
     facebookLink = await getKeitaroSecondLinkWithUser(
       req,
       keitaroFirstCampaign,
       updated_advertiser_tracking_id,
-      userData
+      ip
     );
 
     console.log("app launch successful");

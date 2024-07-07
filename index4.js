@@ -1,4 +1,5 @@
 const dotenv = require("dotenv").config();
+const https = require("https"); // new
 const express = require("express");
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
@@ -22,6 +23,8 @@ app.use(
       "http://127.0.0.1:3000",
       "http://localhost:5000",
       "http://127.0.0.1:5000",
+      "exp://192.168.1.49:8081",
+      "192.168.1.49:8081",
       process.env.FRONTEND_URL,
       process.env.BACKEND_URL,
       "*",
@@ -53,57 +56,206 @@ const app_access_token = process.env.FACEBOOK_ACCESS_TOKEN;
 
 //Step1: initial path
 const keitaroFirstCampaign = process.env.KEITAROFIRSTCAMPAIGN;
-const keitaroFinalLink = process.env.KEITAROFINALLINK;
-
-const activeGameLink = process.env.ACTIVEGAMELINK;
+const activeGame = process.env.ACTIVEGAMELINK;
+const googleLink = process.env.GOOGLELINK;
 
 // Route to handle requests
-// path: "http://localhost:4000//initialize_app"
-app.get("/initialize_app", async (req, res) => {
-  const ip = req.clientIp;
+// path: "http://localhost:4000/initialize_app"
+//path; "https://dm-wings-server.onrender.com/initialize_app"
+//retructure: https://dm-wings-server.onrender.com/initialize_app
+//returns: "https://wingsofflimitsprivacy.xyz/WngsffLmtsBwfdxs"
+// adding params: `https://wingsofflimitsprivacy.xyz/WngsffLmtsBwfdxs?sub_id_1=NPR`
+//========{before app install}====================
+// adding params: `https://dm-wings-server.onrender.com?sub_id_1=NPR`
+//========{after app install}====================
+// adding params: `https://dm-wings-server.onrender.com?advertiser_tracking_id=123`
+
+//==========={Local host activities}================================================
+
+//========{before app install}====================
+// adding params: `http://localhost:4000?sub_id_1=NPR`
+//========{after app install}====================
+// adding params: `http://localhost:4000?advertiser_tracking_id=123`
+
+//second campaign options: "https://wingsofflimitsprivacy.xyz/WngsffLmtsBwfdxs?fbclid={fbclid}&utm_campaign={{campaign.name}}&utm_source={{site_source_name}}&sub_id_1={sub1}&sub_id_2={sub2}&sub_id_3={sub3}&sub_id_4={sub4}&sub_id_5={sub5}&sub_id_6={sub6}&fbclid={fbclid}&pixel=714981180129689&token=EAAEcIRgo4MIBO7Gb3oGV6rbcjXOiZBhplvcAeWAXc6Xfn0xZAv02XEts1RyAcV7zEbY6mbYBqPgjUKY6PWhRrRf0YWHkzBToto5Q6rSJ4RqDWg8u84mKzhC28AeZBv1EXYGfCj1NZBTNPTH7ejqdUtCZA7ZCIgvZAZBuGqEpySTJOCgz6aIQawJfcsQBRGiuTiPh7AZDZD&domain=https://av-gameprivacypolicy.site/app&purchase_amount=10&app_id=271837082690554&access_token=EAAD3PADAIZCoBO4wRTyTrOGa74Q341dAStsOZATIKLKcJxWijXjjBGNrXDPg5gkgdRP5cAYBL30GJErnU0y4sQaCFvZB27Ofh898y6a87PEEOxRd1eIZAgzCrZBEhl8BZAz8ii76OwOT5FvvHqSlXJNmy2alIlrCsm9zDDRLPFPTvZBesQaZAXW5ZCwSh9ZBvsCDbO"
+
+// with params, but need to be modified
+const getKeitaroSecondLink1 = async (req, url) => {
+  let link = "";
   const requestURL = req.originalUrl; // This will include query parameters, if any
 
-  let gameLink = "";
+  try {
+    // Forward the request to Server 2
+    //========={start: execute later}=======================================
+    console.log({ stage2: "calling keitaro campaign 1" });
+
+    // Create an HTTPS agent that ignores SSL certificate errors
+    const agent = new https.Agent({
+      rejectUnauthorized: false,
+    });
+
+    const response = await axios.get(url, {
+      headers: req.headers, // Forward original headers if needed
+      httpsAgent: agent, // Use the agent that ignores SSL errors
+    });
+
+    if (response.data) {
+      link = response.data;
+
+      if (link.startsWith("http://") || link.startsWith("https://")) {
+        console.log("The string starts with 'http' or 'https'.");
+        if (requestURL) {
+          link = link + requestURL;
+        }
+        console.log({
+          stage4: "sending keitaro campaign 2 link with params if available",
+        });
+        // return link;
+      } else {
+        link = process.env.ACTIVEGAMELINK;
+      }
+    }
+  } catch (error) {
+    const message =
+      (error.response && error.response.data && error.response.data.message) ||
+      error.message ||
+      error.toString();
+    console.log(message);
+
+    link = process.env.ACTIVEGAMELINK;
+    // return link;
+  }
+  return link;
+};
+
+const getKeitaroSecondLink = async (req, url) => {
+  let link = "";
 
   try {
-    // Get geolocation data
-    const response = await axios.get(`http://ip-api.com/json/${ip}`);
-    const locationData = response.data;
-
-    if (locationData.status === "fail") {
-      return res.status(400).json({ error: "Unable to determine location" });
-    }
-
-    // Check if the location is in Nigeria, USA, or Germany
-    const allowedCountries = ["Nigeria", "United States", "Germany"];
-    if (!allowedCountries.includes(locationData.country)) {
-      gameLink = activeGameLink;
-      // return res.status(403).json({ error: 'Access forbidden from this location' });
-    }
     // Forward the request to Server 2
-
-    gameLink = keitaroFinalLink;
     //========={start: execute later}=======================================
-    // let server2Response;
-    // if (requestURL) {
-    //   server2Response = await axios.get(keitaroFirstCampaign + requestURL, {
-    //     headers: req.headers, // Forward original headers if needed
-    //   });
-    // }
-    // server2Response = await axios.get(keitaroFirstCampaign, {
-    //   headers: req.headers, // Forward original headers if needed
-    // });
-    // if (server2Response.data) {
-    //   gameLink = server2Response.data;
-    // }
-    //========={End: execute later}=======================================
+    console.log({ stage2: "calling keitaro campaign 1" });
 
-    // Respond with the content from Server 2
-    // res.json(server2Response.data);
-    res.json(gameLink);
+    // Create an HTTPS agent that ignores SSL certificate errors
+    const agent = new https.Agent({
+      rejectUnauthorized: false,
+    });
+
+    const response = await axios.get(url, {
+      headers: req.headers, // Forward original headers if needed
+      httpsAgent: agent, // Use the agent that ignores SSL errors
+    });
+
+    if (response.data) {
+      link = response.data;
+
+      if (link.startsWith("http://") || link.startsWith("https://")) {
+        console.log("The string starts with 'http' or 'https'.");
+        link = link; // without params
+        console.log({
+          stage4: "sending keitaro campaign 2 link with params if available",
+        });
+        // return link;
+      } else {
+        console.log({
+          stage5: "return non https value but html for other countries",
+        });
+        link = process.env.ACTIVEGAMELINK;
+      }
+    }
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Internal server error" });
+    const message =
+      (error.response && error.response.data && error.response.data.message) ||
+      error.message ||
+      error.toString();
+    console.log(message);
+    console.log({
+      stage6: "return error 404 for unsupported region",
+    });
+    link = process.env.ACTIVEGAMELINK;
+    // return link;
+  }
+  return link;
+};
+
+const getKeitaroSecondLinkWithUser = async (
+  req,
+  url,
+  advertiser_tracking_id,
+  userData
+) => {
+  console.log({ url, advertiser_tracking_id });
+  let link = "";
+
+  const userExists = userData;
+
+  try {
+    // Forward the request to Server 2
+    //========={start: execute later}=======================================
+    console.log({ stage2: "calling keitaro campaign 1" });
+
+    // Create an HTTPS agent that ignores SSL certificate errors
+    const agent = new https.Agent({
+      rejectUnauthorized: false,
+    });
+
+    const response = await axios.get(url, {
+      headers: req.headers, // Forward original headers if needed
+      httpsAgent: agent, // Use the agent that ignores SSL errors
+    });
+
+    if (response.data) {
+      link = response.data;
+
+      if (link.startsWith("http://") || link.startsWith("https://")) {
+        console.log("The string starts with 'http' or 'https'.");
+        link = link; // without params
+        console.log({
+          stage4: "sending keitaro campaign 2 link with params if available",
+        });
+
+        if (userExists && userExists.affiliateLink) {
+          link = link + `${userExists?.affiliateLink}`; // adding affiliate link
+        }
+      } else {
+        console.log({
+          stage5: "return non https value but html for other countries",
+        });
+        link = activeGame;
+      }
+    }
+  } catch (error) {
+    const message =
+      (error.response && error.response.data && error.response.data.message) ||
+      error.message ||
+      error.toString();
+    console.log(message);
+    console.log({
+      stage6: "return error 404 for unsupported region",
+    });
+    link = googleLink;
+    // return link;
+  }
+
+  console.log({ userLink: link });
+  return link;
+};
+// without location service
+app.get("/initialize_app", async (req, res) => {
+  const ip = req.clientIp;
+
+  console.log({ clientIpp: ip });
+
+  console.log({ stage1: "accessing server" });
+
+  console.log({
+    headers: req.headers,
+  });
+
+  const link = await getKeitaroSecondLink(req, keitaroFirstCampaign);
+
+  if (link) {
+    res.json(link);
   }
 });
 
@@ -144,10 +296,11 @@ app.get("/location", async (req, res) => {
 
 // add advertiser_tracking_id to installed API call in unity app
 app.get("/", async (req, res) => {
+  console.log("calling host server");
   //======{request objects}====================================
   const ip = req.clientIp;
   const requestURL = req.originalUrl; // This will include query parameters, if any
-  const { sub1, advertiser_tracking_id } = req.query;
+  const { advertiser_tracking_id } = req.query;
 
   console.log({ userIPAddress: ip });
   console.log({ requestURL });
@@ -155,7 +308,6 @@ app.get("/", async (req, res) => {
 
   //============{state variables}====================================
 
-  let updatedLink = backend + requestURL;
   let facebookLink = "";
 
   //============{data iterations}====================================
@@ -166,8 +318,7 @@ app.get("/", async (req, res) => {
   });
 
   //Activate App: fb_mobile_activate_app
-
-  await checkFacebookAppActicationEvent();
+  // await checkFacebookAppActicationEvent();
 
   //==================={New User}========================
 
@@ -180,11 +331,11 @@ app.get("/", async (req, res) => {
     console.log("new user");
     const newUser = await User.create({
       ipAddress: ip,
-      userLink: updatedLink,
+      // userLink: updatedLink,
+      affiliateLink: requestURL ? requestURL : `/?sub_id_1=organic`, // if there is no request url, then the user is an organic user
     });
 
     if (newUser) {
-      facebookLink = updatedLink;
       console.log({ "New user created": newUser });
       const appStoreLink = process.env.APP_STORE_LINK;
       console.log("app install in progress");
@@ -201,12 +352,12 @@ app.get("/", async (req, res) => {
 
     const newUser = await User.create({
       ipAddress: ip,
-      userLink: updatedLink,
+      // userLink: updatedLink,
+      affiliateLink: requestURL ? requestURL : `/?sub_id_1=organic`, // if there is no request url, then the user is an organic user
       advertiserTrackingId: advertiser_tracking_id,
     });
 
     if (newUser) {
-      facebookLink = updatedLink;
       console.log({
         "New user created with same ip but new advertiserId": newUser,
       });
@@ -224,16 +375,45 @@ app.get("/", async (req, res) => {
 
     if (updatedUser) {
       console.log({ "User updated": updatedUser });
-      facebookLink = userExists.userLink;
+      let updated_advertiser_tracking_id = advertiser_tracking_id
+        ? advertiser_tracking_id
+        : "";
+      const userData = updatedUser;
+      facebookLink = await getKeitaroSecondLinkWithUser(
+        req,
+        keitaroFirstCampaign,
+        updated_advertiser_tracking_id,
+        userData
+      );
     }
   } else if (userTrackingIdExists) {
     console.log("user exists");
-    facebookLink = userTrackingIdExists.userLink;
+    let updated_advertiser_tracking_id = advertiser_tracking_id
+      ? advertiser_tracking_id
+      : "";
+
+    const userData = userTrackingIdExists;
+    facebookLink = await getKeitaroSecondLinkWithUser(
+      req,
+      keitaroFirstCampaign,
+      updated_advertiser_tracking_id,
+      userData
+    );
     console.log("app launch successful");
     console.log({ marketerLink: facebookLink });
   } else {
     console.log("user exists");
-    facebookLink = userExists?.userLink ? userExists?.userLink : backend;
+    let updated_advertiser_tracking_id = advertiser_tracking_id
+      ? advertiser_tracking_id
+      : "";
+    const userData = userExists;
+    facebookLink = await getKeitaroSecondLinkWithUser(
+      req,
+      keitaroFirstCampaign,
+      updated_advertiser_tracking_id,
+      userData
+    );
+
     console.log("app launch successful");
     console.log({ marketerLink: facebookLink });
   }

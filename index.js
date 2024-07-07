@@ -61,12 +61,13 @@ const activeGameLink = process.env.ACTIVEGAMELINK;
 
 // Route to handle requests
 // path: "http://localhost:4000/initialize_app"
+//path; "https://dm-wings-server.onrender.com/initialize_app"
 
 // without location service
 app.get("/initialize_app", async (req, res) => {
   const ip = req.clientIp;
 
-  console.log({clientIpp:ip})
+  console.log({ clientIpp: ip });
   const requestURL = req.originalUrl; // This will include query parameters, if any
 
   console.log({ stage1: "accessing server" });
@@ -79,13 +80,13 @@ app.get("/initialize_app", async (req, res) => {
     console.log({ stage2: "calling keitaro campaign 1" });
 
     //For server call
-    // const server2Response = await axios.get(keitaroFirstCampaign, {
-    //   headers: req.headers, // Forward original headers if needed
-    // });
+    const server2Response = await axios.get(keitaroFirstCampaign, {
+      headers: req.headers, // Forward original headers if needed
+    });
 
     // for local host testing
 
-    const server2Response = await axios.get(keitaroFirstCampaign);
+    // const server2Response = await axios.get(keitaroFirstCampaign);
     if (server2Response.data) {
       console.log({ stage3: "Received keitaro campaign 2 link" });
       let secondKeitaroCampaign = server2Response.data;

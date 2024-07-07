@@ -1,5 +1,4 @@
 const dotenv = require("dotenv").config();
-const https = require("https"); // new
 const express = require("express");
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
@@ -77,20 +76,13 @@ app.get("/initialize_app", async (req, res) => {
     //========={start: execute later}=======================================
     console.log({ stage2: "calling keitaro campaign 1" });
 
-    // Create an HTTPS agent that ignores SSL certificate errors
-    const agent = new https.Agent({
-      rejectUnauthorized: false,
-    });
-
     //For server call
-    const server2Response = await axios.get(keitaroFirstCampaign, {
-      headers: req.headers, // Forward original headers if needed
-      httpsAgent: agent, // Use the agent that ignores SSL errors
-    });
+    // const server2Response = await axios.get(keitaroFirstCampaign, {
+    //   headers: req.headers, // Forward original headers if needed
+    // });
 
     // for local host testing
-
-    // const server2Response = await axios.get(keitaroFirstCampaign);
+    const server2Response = await axios.get(keitaroFirstCampaign);
     if (server2Response.data) {
       console.log({ stage3: "Received keitaro campaign 2 link" });
       let secondKeitaroCampaign = server2Response.data;

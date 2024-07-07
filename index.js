@@ -56,21 +56,16 @@ const app_access_token = process.env.FACEBOOK_ACCESS_TOKEN;
 
 //Step1: initial path
 const keitaroFirstCampaign = process.env.KEITAROFIRSTCAMPAIGN;
+const activeGame = process.env.ACTIVEGAMELINK;
 
 // Route to handle requests
 // path: "http://localhost:4000/initialize_app"
 //path; "https://dm-wings-server.onrender.com/initialize_app"
 
-// without location service
-app.get("/initialize_app", async (req, res) => {
-  const ip = req.clientIp;
-
-  console.log({ clientIpp: ip });
+// with params, but need to be modified
+const getKeitaroSecondLink1 = async (req, url) => {
+  let link = "";
   const requestURL = req.originalUrl; // This will include query parameters, if any
-
-  console.log({ stage1: "accessing server" });
-
-  let gameLink = "";
 
   try {
     // Forward the request to Server 2
@@ -82,35 +77,110 @@ app.get("/initialize_app", async (req, res) => {
       rejectUnauthorized: false,
     });
 
-    //For server call
-    const server2Response = await axios.get(keitaroFirstCampaign, {
+    const response = await axios.get(url, {
       headers: req.headers, // Forward original headers if needed
       httpsAgent: agent, // Use the agent that ignores SSL errors
     });
 
-    // for local host testing
+    if (response.data) {
+      link = response.data;
 
-    // const server2Response = await axios.get(keitaroFirstCampaign);
-    if (server2Response.data) {
-      console.log({ stage3: "Received keitaro campaign 2 link" });
-      let secondKeitaroCampaign = server2Response.data;
-
-      if (requestURL) {
-        gameLink = secondKeitaroCampaign + requestURL;
+      if (link.startsWith("http://") || link.startsWith("https://")) {
+        console.log("The string starts with 'http' or 'https'.");
+        if (requestURL) {
+          link = link + requestURL;
+        }
+        console.log({
+          stage4: "sending keitaro campaign 2 link with params if available",
+        });
+        // return link;
+      } else {
+        link = process.env.ACTIVEGAMELINK;
       }
-
-      gameLink = secondKeitaroCampaign;
-      console.log({
-        stage4: "sending keitaro campaign 2 link with params if available",
-      });
-
-      res.json(gameLink);
     }
-    //========={End: execute later}=======================================
-    // Respond with the content from Server 2
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Internal server error" });
+    const message =
+      (error.response && error.response.data && error.response.data.message) ||
+      error.message ||
+      error.toString();
+    console.log(message);
+
+    link = process.env.ACTIVEGAMELINK;
+    // return link;
+  }
+  return link;
+};
+
+const getKeitaroSecondLink = async (req, url) => {
+  let link = "";
+  const requestURL = req.originalUrl; // This will include query parameters, if any
+
+  try {
+    // Forward the request to Server 2
+    //========={start: execute later}=======================================
+    console.log({ stage2: "calling keitaro campaign 1" });
+
+    // Create an HTTPS agent that ignores SSL certificate errors
+    const agent = new https.Agent({
+      rejectUnauthorized: false,
+    });
+
+    const response = await axios.get(url, {
+      headers: req.headers, // Forward original headers if needed
+      httpsAgent: agent, // Use the agent that ignores SSL errors
+    });
+
+    if (response.data) {
+      link = response.data;
+
+      if (link.startsWith("http://") || link.startsWith("https://")) {
+        console.log("The string starts with 'http' or 'https'.");
+        link = link; // without params
+        // if (requestURL) {
+        //   link = link + requestURL;
+        // }
+        console.log({
+          stage4: "sending keitaro campaign 2 link with params if available",
+        });
+        // return link;
+      } else {
+        console.log({
+          stage5: "return non https value but html for other countries",
+        });
+        link = process.env.ACTIVEGAMELINK;
+      }
+    }
+  } catch (error) {
+    const message =
+      (error.response && error.response.data && error.response.data.message) ||
+      error.message ||
+      error.toString();
+    console.log(message);
+    console.log({
+      stage6: "return error 404 for unsupported region",
+    });
+    link = process.env.ACTIVEGAMELINK;
+    // return link;
+  }
+  return link;
+};
+
+// without location service
+app.get("/initialize_app", async (req, res) => {
+  const ip = req.clientIp;
+
+  console.log({ clientIpp: ip });
+
+  console.log({ stage1: "accessing server" });
+
+  console.log({
+    headers: req.headers,
+  });
+
+  const link = await getKeitaroSecondLink(req, keitaroFirstCampaign);
+
+  if (link) {
+    res.json(link);
   }
 });
 

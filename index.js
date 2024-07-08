@@ -1,7 +1,6 @@
 const dotenv = require("dotenv").config();
 const https = require("https"); // new
 const path = require("path");
-const puppeteer = require("puppeteer");
 const crypto = require("crypto");
 const express = require("express");
 const mongoose = require("mongoose");
@@ -9,12 +8,26 @@ const bodyParser = require("body-parser");
 const cors = require("cors");
 const axios = require("axios");
 const { errorHandler } = require("./middleware/errorMiddleware.js");
-const User = require("./models/User.js");
+const { Facebook } = require("facebook-nodejs-sdk");
+const FB = require("fb").default;
 
+const User = require("./models/User.js");
 const app = express();
 // Middlewares
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+const facebookAppId = process.env.FACEBOOK_APP_ID;
+const facebookAppSecret = process.env.FACEBOOK_APP_SECRET;
+const accessToken = process.env.FACEBOOK_ACCESS_TOKEN;
+
+FB.options({
+  version: "v10.0",
+  appId: facebookAppId,
+  appSecret: facebookAppSecret,
+  accessToken: accessToken,
+});
+
 app.use(bodyParser.json());
 app.use(express.static("public"));
 // app.use(cors());
@@ -58,10 +71,15 @@ app.use((req, res, next) => {
 // -momery unleaked---------
 app.set("trust proxy", 1);
 
+let fbInitialized = false;
 const PORT = process.env.PORT || 5000;
 const backend = process.env.BACKEND_URL;
 const app_id = process.env.FACEBOOK_APP_ID;
 const app_access_token = process.env.FACEBOOK_ACCESS_TOKEN;
+
+// const facebookAppId = process.env.FACEBOOK_APP_ID;
+// const facebookAppSecret = process.env.FACEBOOK_APP_SECRET;
+// const accessToken = process.env.FACEBOOK_ACCESS_TOKEN;
 
 //Step1: initial path
 const keitaroFirstCampaign = process.env.KEITAROFIRSTCAMPAIGN;
@@ -69,174 +87,14 @@ const activeGame = process.env.ACTIVEGAMELINK;
 const googleLink = process.env.GOOGLELINK;
 // Connect to DB and start server
 
-//==============================={Testing puppeteer}================================================
-
-// Endpoint to serve the test HTML page
-app.get("/test", (req, res) => {
-  res.sendFile(path.join(__dirname, "./public/test.html"));
-});
-
-app.get("/check_test", (req, res) => {
-  testHTMLLoading();
-});
-
-async function testHTMLLoading() {
-  // const browser = await puppeteer.launch({
-  //   headless: true,
-  //   args: ['--no-sandbox', '--disable-setuid-sandbox']
-  // });
-  const browser = await puppeteer.launch();
-
-  const page = await browser.newPage();
-
-  // Navigate to the test page
-  await page.goto(`${backend}/test`);
-
-  // Take a screenshot for verification
-  await page.screenshot({ path: "test_page.png" });
-
-  // Get the page content
-  const content = await page.content();
-
-  // Close the browser
-  await browser.close();
-
-  console.log("Page content:", content);
-}
-
-//==============================={facebook SDK}================================================
-
-// Endpoint to serve the Facebook SDK HTML page
-app.get("/facebook-sdk", (req, res) => {
-  res.sendFile(path.join(__dirname, "./public/facebook-sdk.html"));
-});
-
-// Function to check if Facebook SDK is loaded
-async function checkFacebookSDK() {
-  try {
-    const browser = await puppeteer.launch();
-    const page = await browser.newPage();
-    await page.goto(`${backend}/facebook-sdk`);
-
-    // Wait for the Facebook SDK to be initialized
-    const sdkLoaded = await page.waitForFunction(
-      () => {
-        return window.FB && window.FB.AppEvents;
-      },
-      { timeout: 30000 }
-    );
-
-    console.log("Facebook SDK loaded:", sdkLoaded);
-
-    await browser.close();
-    return sdkLoaded ? true : false;
-  } catch (error) {
-    console.error("Error checking Facebook SDK:", error);
-    return false;
-  }
+// Helper function to hash data
+function hashData(data) {
+  return crypto.createHash("sha256").update(data).digest("hex");
 }
 
 //http://localhost:4000/create_facebook_purchase_event?fbclid=123&value=25
-// Function to create Facebook event using Puppeteer
-async function createFacebookEvent1(eventType, eventData, req) {
-  const {
-    fbclid,
-    external_id,
-    date,
-    client_ip_address,
-    client_user_agent,
-    value,
-    currency,
-  } = eventData;
 
-  const ip =
-    client_ip_address ||
-    req.headers["cf-connecting-ip"] ||
-    req.headers["x-real-ip"] ||
-    req.headers["x-forwarded-for"] ||
-    req.socket.remoteAddress ||
-    "";
-  const unixTimeNow = Math.floor(Date.now() / 1000);
-
-  const payload = {
-    event_name: eventType,
-    event_time: date || unixTimeNow,
-    user_data: {
-      client_ip_address: ip,
-      client_user_agent: client_user_agent || req.headers["user-agent"],
-      fbc: fbclid ? `fb.1.${date || unixTimeNow}.${fbclid}` : null,
-      fbp: `fb.1.${date || unixTimeNow}.${external_id || "user123"}`,
-    },
-    custom_data: {
-      currency: currency ? currency : "USD",
-      value: value ? value : 20,
-      external_id: external_id ? external_id.toString() : "user123",
-    },
-  };
-
-  console.log({ payload });
-
-  try {
-    const browser = await puppeteer.launch();
-    const page = await browser.newPage();
-    await page.goto(`${backend}/facebook-sdk`);
-
-    console.log("initializing FB SDK");
-
-    // Wait for the Facebook SDK to be initialized
-    await page.waitForFunction(() => window.FB && window.FB.AppEvents, {
-      timeout: 30000,
-    });
-
-    await page.evaluate(
-      (eventType, payload) => {
-        FB.AppEvents.logEvent(eventType, payload.custom_data.value, {
-          ...payload.custom_data,
-          ...payload.user_data,
-        });
-      },
-      eventType,
-      payload
-    );
-
-    console.log({
-      success: true,
-      message: `${eventType} event logged successfully`,
-    });
-
-    await browser.close();
-
-    // const result = await page.evaluate(
-    //   (eventType, payload) => {
-    //     return new Promise((resolve, reject) => {
-    //       try {
-    //         FB.AppEvents.logEvent(eventType, payload.custom_data.value, {
-    //           ...payload.custom_data,
-    //           ...payload.user_data,
-    //         });
-    //         resolve({
-    //           success: true,
-    //           message: `${eventType} event logged successfully`,
-    //         });
-    //       } catch (error) {
-    //         reject({ success: false, message: error.message });
-    //       }
-    //     });
-    //   },
-    //   eventType,
-    //   payload
-    // );
-
-    // console.log({result});
-
-    // await browser.close();
-    // return result;
-  } catch (error) {
-    console.error("Error:", error);
-  }
-}
-
-// Function to create Facebook event using Puppeteer with retry mechanism
+// Function to create Facebook event using the Facebook SDK
 async function createFacebookEvent(eventType, eventData, req) {
   const {
     fbclid,
@@ -273,74 +131,45 @@ async function createFacebookEvent(eventType, eventData, req) {
     },
   };
 
-  console.log({ payload });
-  const browser = await puppeteer.launch();
+  console.log("Payload constructed:", payload);
 
-  const page = await browser.newPage();
+  try {
+    console.log("Logging event to Facebook");
 
-  async function logEventWithRetry(attempt = 1) {
-    try {
-      await page.goto(`${backend}/facebook-sdk`);
-      console.log("initializing FB SDK");
+    const response = await FB.api(`/${facebookAppId}/events`, "POST", {
+      data: [payload],
+    });
 
-      // Wait for the Facebook SDK to be initialized
-      await page.waitForFunction(() => window.FB && window.FB.AppEvents, {
-        timeout: 30000,
-      });
-
-      const result = await page.evaluate(
-        async (eventType, payload) => {
-          return new Promise((resolve) => {
-            FB.AppEvents.logEvent(eventType, payload.custom_data.value, {
-              ...payload.custom_data,
-              ...payload.user_data,
-            });
-            resolve({
-              success: true,
-              message: `${eventType} event logged successfully`,
-            });
-          });
-        },
-        eventType,
-        payload
-      );
-
-      console.log(result);
-      await browser.close();
-      return result;
-    } catch (error) {
-      if (attempt <= 3) {
-        console.warn(`Attempt ${attempt} failed, retrying...`, error);
-        return await logEventWithRetry(attempt + 1);
-      } else {
-        console.error("Error:", error);
-        await browser.close();
-        return { success: false, message: error.message };
-      }
-    }
+    console.log("Event logged successfully:", response);
+    return { success: true, message: `${eventType} event logged successfully` };
+  } catch (error) {
+    console.error("Error:", error);
+    return { success: false, message: error.message };
   }
-
-  return await logEventWithRetry();
 }
 
 // Endpoint to create Facebook purchase event
 app.get("/create_facebook_purchase_event", async (req, res) => {
-  await createFacebookEvent("Purchase", req.params, req);
-  res.status(200).send("Purchase event processed");
+  const result = await createFacebookEvent("Purchase", req.params, req);
+  res.status(result.success ? 200 : 500).json(result);
 });
 
 // Endpoint to create Facebook lead event
 app.get("/create_facebook_lead_event", async (req, res) => {
-  await createFacebookEvent("Lead", req.params, req);
-  res.status(200).send("Lead event processed");
+  const result = await createFacebookEvent("Lead", req.params, req);
+  res.status(result.success ? 200 : 500).json(result);
+});
+// Endpoint to check if Facebook SDK is initialized
+app.get("/check_facebook_sdk", (req, res) => {
+  if (fbInitialized) {
+    res.status(200).json({ sdkLoaded: true });
+  } else {
+    res
+      .status(500)
+      .json({ sdkLoaded: false, message: "Facebook SDK not loaded" });
+  }
 });
 
-// Endpoint to check if Facebook SDK is loaded
-app.get("/check_facebook_sdk", async (req, res) => {
-  const sdkLoaded = await checkFacebookSDK();
-  console.log({ sdkLoaded });
-  res.status(200).json({ sdkLoaded });
-});
 //==============================={Main calls}================================================
 // Route to handle requests
 // path: "http://localhost:4000/initialize_app"
@@ -361,10 +190,6 @@ app.get("/check_facebook_sdk", async (req, res) => {
 // adding params: `http://localhost:4000?advertiser_tracking_id=123`
 
 //second campaign options: "https://wingsofflimitsprivacy.xyz/WngsffLmtsBwfdxs?fbclid={fbclid}&utm_campaign={{campaign.name}}&utm_source={{site_source_name}}&sub_id_1={sub1}&sub_id_2={sub2}&sub_id_3={sub3}&sub_id_4={sub4}&sub_id_5={sub5}&sub_id_6={sub6}&fbclid={fbclid}&pixel=714981180129689&token=EAAEcIRgo4MIBO7Gb3oGV6rbcjXOiZBhplvcAeWAXc6Xfn0xZAv02XEts1RyAcV7zEbY6mbYBqPgjUKY6PWhRrRf0YWHkzBToto5Q6rSJ4RqDWg8u84mKzhC28AeZBv1EXYGfCj1NZBTNPTH7ejqdUtCZA7ZCIgvZAZBuGqEpySTJOCgz6aIQawJfcsQBRGiuTiPh7AZDZD&domain=https://av-gameprivacypolicy.site/app&purchase_amount=10&app_id=271837082690554&access_token=EAAD3PADAIZCoBO4wRTyTrOGa74Q341dAStsOZATIKLKcJxWijXjjBGNrXDPg5gkgdRP5cAYBL30GJErnU0y4sQaCFvZB27Ofh898y6a87PEEOxRd1eIZAgzCrZBEhl8BZAz8ii76OwOT5FvvHqSlXJNmy2alIlrCsm9zDDRLPFPTvZBesQaZAXW5ZCwSh9ZBvsCDbO"
-// Helper function to hash data
-function hashData(data) {
-  return crypto.createHash("sha256").update(data).digest("hex");
-}
 
 //=================++++{keitaro endpoint }=================================================
 
@@ -758,13 +583,36 @@ async function createFacebookAppInstallEvent() {
 //http://localhost:4000/create_facebook_purchase_event?fbclid=user123&sub_id_10=abcdefg&external_id=user123
 //
 
-const server = app.listen(PORT, () => {
-  console.log(`Server Running on port ${PORT}`);
-});
+//====={server}===========================================
+// const server = app.listen(PORT, () => {
+//   console.log(`Server Running on port ${PORT}`);
+// });
 
-mongoose
-  .connect(process.env.MONGO_URL)
-  .then(() => {
-    server;
-  })
-  .catch((err) => console.log(err));
+// mongoose
+//   .connect(process.env.MONGO_URL)
+//   .then(() => {
+//     server;
+//     // fbInitialized = true;
+//     // console.log("Facebook SDK initialized");
+//   })
+//   .catch((err) => console.log(err));
+
+// Initialize the server
+async function initializeServer() {
+  try {
+    await mongoose.connect(process.env.MONGO_URL);
+    console.log("Connected to MongoDB");
+
+    fbInitialized = true;
+    console.log("Facebook SDK initialized");
+
+    const server = app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error("Error initializing server:", error);
+  }
+}
+
+// Call the initialize function
+initializeServer();

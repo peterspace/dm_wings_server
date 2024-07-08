@@ -15,14 +15,13 @@
     <script>
       window.fbAsyncInit = function () {
         FB.init({
-          // appId: 'YOUR_FACEBOOK_APP_ID',
-          appId: "271837082690554",
+          appId: "271837082690554", // Use your Facebook App ID from the environment variable
           autoLogAppEvents: true,
           xfbml: true,
           version: "v12.0",
         });
 
-        // You can log events here using FB.AppEvents.logEvent
+        // Log event here if needed for testing
         console.log("Facebook SDK initialized");
       };
 

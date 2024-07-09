@@ -8,25 +8,12 @@ const bodyParser = require("body-parser");
 const cors = require("cors");
 const axios = require("axios");
 const { errorHandler } = require("./middleware/errorMiddleware.js");
-const { Facebook } = require("facebook-nodejs-sdk");
-const FB = require("fb").default;
 
 const User = require("./models/User.js");
 const app = express();
 // Middlewares
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-
-const facebookAppId = process.env.FACEBOOK_APP_ID;
-const facebookAppSecret = process.env.FACEBOOK_APP_SECRET;
-const accessToken = process.env.FACEBOOK_ACCESS_TOKEN;
-
-FB.options({
-  version: "v10.0",
-  appId: facebookAppId,
-  appSecret: facebookAppSecret,
-  accessToken: accessToken,
-});
 
 app.use(bodyParser.json());
 app.use(express.static("public"));
@@ -70,10 +57,9 @@ app.use((req, res, next) => {
 
 // -momery unleaked---------
 app.set("trust proxy", 1);
-
-let fbInitialized = false;
 const PORT = process.env.PORT || 5000;
 const backend = process.env.BACKEND_URL;
+const frontend = process.env.FRONTEND_URL;
 const app_id = process.env.FACEBOOK_APP_ID;
 const app_access_token = process.env.FACEBOOK_ACCESS_TOKEN;
 
@@ -94,80 +80,58 @@ function hashData(data) {
 
 //http://localhost:4000/create_facebook_purchase_event?fbclid=123&value=25
 
-// Function to create Facebook event using the Facebook SDK
-async function createFacebookEvent(eventType, eventData, req) {
-  const {
-    fbclid,
-    external_id,
-    date,
-    client_ip_address,
-    client_user_agent,
-    value,
-    currency,
-  } = eventData;
-
-  const ip =
-    client_ip_address ||
-    req.headers["cf-connecting-ip"] ||
-    req.headers["x-real-ip"] ||
-    req.headers["x-forwarded-for"] ||
-    req.socket.remoteAddress ||
-    "";
-  const unixTimeNow = Math.floor(Date.now() / 1000);
-
-  const payload = {
-    event_name: eventType,
-    event_time: date || unixTimeNow,
-    user_data: {
-      client_ip_address: ip,
-      client_user_agent: client_user_agent || req.headers["user-agent"],
-      fbc: fbclid ? `fb.1.${date || unixTimeNow}.${fbclid}` : null,
-      fbp: `fb.1.${date || unixTimeNow}.${external_id || "user123"}`,
-    },
-    custom_data: {
-      currency: currency ? currency : "USD",
-      value: value ? value : 20,
-      external_id: external_id ? external_id.toString() : "user123",
-    },
-  };
-
-  console.log("Payload constructed:", payload);
-
-  try {
-    console.log("Logging event to Facebook");
-
-    const response = await FB.api(`/${facebookAppId}/events`, "POST", {
-      data: [payload],
-    });
-
-    console.log("Event logged successfully:", response);
-    return { success: true, message: `${eventType} event logged successfully` };
-  } catch (error) {
-    console.error("Error:", error);
-    return { success: false, message: error.message };
-  }
-}
+//http://localhost:4000/create_facebook_purchase_event?fbclid=123&external_id=user125
+//http://localhost:4000/create_facebook_lead_event?fbclid=123&external_id=user125
 
 // Endpoint to create Facebook purchase event
 app.get("/create_facebook_purchase_event", async (req, res) => {
-  const result = await createFacebookEvent("Purchase", req.params, req);
-  res.status(result.success ? 200 : 500).json(result);
+  const event = "purchase";
+  const { client_ip_address, fbclid, external_id } = req.query;
+
+  console.log({ serverParams: req.query });
+  // http://localhost:5173/purchase/123/user245
+  let url = "";
+
+  if (client_ip_address && fbclid && external_id) {
+    url = `${frontend}/${event}/${client_ip_address}/${fbclid}/${external_id}`;
+  }
+
+  if (!client_ip_address && fbclid && external_id) {
+    url = `${frontend}/${event}/${fbclid}/${external_id}`;
+  }
+
+  if (!client_ip_address && !fbclid && external_id) {
+    url = `${frontend}/${event}/${external_id}`;
+  }
+
+  console.log({ "Purchase Redirect Url": url });
+
+  res.redirect(url);
 });
 
 // Endpoint to create Facebook lead event
 app.get("/create_facebook_lead_event", async (req, res) => {
-  const result = await createFacebookEvent("Lead", req.params, req);
-  res.status(result.success ? 200 : 500).json(result);
-});
-// Endpoint to check if Facebook SDK is initialized
-app.get("/check_facebook_sdk", (req, res) => {
-  if (fbInitialized) {
-    res.status(200).json({ sdkLoaded: true });
-  } else {
-    res
-      .status(500)
-      .json({ sdkLoaded: false, message: "Facebook SDK not loaded" });
+  const event = "lead";
+  const { client_ip_address, fbclid, external_id } = req.query;
+  console.log({ serverParams: req.query });
+  // http://localhost:5173/lead/123/user245
+  let url = "";
+
+  if (client_ip_address && fbclid && external_id) {
+    url = `${frontend}/${event}/${client_ip_address}/${fbclid}/${external_id}`;
   }
+
+  if (!client_ip_address && fbclid && external_id) {
+    url = `${frontend}/${event}/${fbclid}/${external_id}`;
+  }
+
+  if (!client_ip_address && !fbclid && external_id) {
+    url = `${frontend}/${event}/${external_id}`;
+  }
+
+  console.log({ "Lead Redirect Url": url });
+
+  res.redirect(url);
 });
 
 //==============================={Main calls}================================================
@@ -395,45 +359,6 @@ app.get("/", async (req, res) => {
   res.json(newLink);
 });
 
-async function checkFacebookAppActicationEvent() {
-  const url = `https://graph.facebook.com/${app_id}/activities?access_token=${app_access_token}`;
-
-  const payload = {
-    event: "CUSTOM_APP_EVENTS",
-    advertiser_tracking_enabled: 1,
-    application_tracking_enabled: 1,
-    custom_events: [{ _eventName: "fb_mobile_activate_app" }],
-    skadnetwork_attribution: {
-      version: "2.2",
-      source_app_id: app_id,
-      conversion_value: 0, // Значение для установки приложения
-    },
-    user_data: { anon_id: "UNIQUE_USER_ID" },
-  };
-
-  const headers = {
-    "Content-Type": "application/json",
-  };
-
-  try {
-    const response = await axios.post(url, payload, { headers: headers });
-
-    if (response.data) {
-      let result = response.data;
-
-      console.log({ result });
-      //{ result: { success: true } }
-    }
-    //====={New update}========================
-  } catch (error) {
-    // const err = error.response.data;
-    console.log(error);
-    console.error(error);
-    // return { status: err.success, message: err.message };
-    // res.json(err);
-  }
-}
-
 //set marketers link inside app
 
 // office
@@ -584,35 +509,13 @@ async function createFacebookAppInstallEvent() {
 //
 
 //====={server}===========================================
-// const server = app.listen(PORT, () => {
-//   console.log(`Server Running on port ${PORT}`);
-// });
+const server = app.listen(PORT, () => {
+  console.log(`Server Running on port ${PORT}`);
+});
 
-// mongoose
-//   .connect(process.env.MONGO_URL)
-//   .then(() => {
-//     server;
-//     // fbInitialized = true;
-//     // console.log("Facebook SDK initialized");
-//   })
-//   .catch((err) => console.log(err));
-
-// Initialize the server
-async function initializeServer() {
-  try {
-    await mongoose.connect(process.env.MONGO_URL);
-    console.log("Connected to MongoDB");
-
-    fbInitialized = true;
-    console.log("Facebook SDK initialized");
-
-    const server = app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
-    });
-  } catch (error) {
-    console.error("Error initializing server:", error);
-  }
-}
-
-// Call the initialize function
-initializeServer();
+mongoose
+  .connect(process.env.MONGO_URL)
+  .then(() => {
+    server;
+  })
+  .catch((err) => console.log(err));

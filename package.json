@@ -17,8 +17,6 @@
     "express": "^4.19.2",
     "express-async-handler": "^1.2.0",
     "express-session": "^1.18.0",
-    "facebook-nodejs-sdk": "^0.1.0",
-    "fb": "^2.0.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.4.5"
   }

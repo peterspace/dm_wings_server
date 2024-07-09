@@ -7,7 +7,6 @@ const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const axios = require("axios");
-const puppeteer = require("puppeteer");
 const { errorHandler } = require("./middleware/errorMiddleware.js");
 
 const User = require("./models/User.js");
@@ -79,56 +78,6 @@ function hashData(data) {
   return crypto.createHash("sha256").update(data).digest("hex");
 }
 
-//testing purchase call from server
-
-async function openUrl(url) {
-  console.log("starting puppeteer launcher");
-  const browser = await puppeteer.launch();
-  const page = await browser.newPage();
-
-  // await page.goto(url, { waitUntil: 'networkidle2' });
-  await page.goto(url);
-
-  // Optionally, you can capture a screenshot
-  // await page.screenshot({ path: "example1.png" });
-
-  const content = await page.content();
-
-  if (content) {
-    console.log("completed");
-    await browser.close();
-  }
-
-  // setTimeout(() => {
-  //   console.log("completed");
-  // }, 3000);
-
-  // Close the browser
-
-  // setTimeout(async () => {
-  //   console.log("completed");
-
-  //   await browser.close();
-  //   console.log("Page content:", content);
-  // }, 5000);
-  // await browser.close();
-}
-
-async function sendPurchaseOnServer() {
-  const url = `${backend}/create_facebook_purchase_event?fbclid=123&external_id=user125`;
-
-  try {
-    const response = await axios.get(url);
-    // if (response.data) {
-    //   console.log({ response: response.data });
-    // }
-  } catch (error) {
-    console.log({ error });
-  }
-}
-
-// sendPurchaseOnServer();
-
 //http://localhost:4000/create_facebook_purchase_event?fbclid=123&value=25
 
 //http://localhost:4000/create_facebook_purchase_event?fbclid=123&external_id=user125
@@ -156,8 +105,8 @@ app.get("/create_facebook_purchase_event", async (req, res) => {
   }
 
   console.log({ "Purchase Redirect Url": url });
-  openUrl(url);
-  // res.redirect(url);
+
+  res.redirect(url);
 });
 
 // Endpoint to create Facebook lead event
@@ -183,17 +132,6 @@ app.get("/create_facebook_lead_event", async (req, res) => {
   console.log({ "Lead Redirect Url": url });
 
   res.redirect(url);
-
-  // openUrl(url)
-});
-
-// Endpoint to create Facebook lead event
-app.get("/facebook_event_notification", async (req, res) => {
-  const { event } = req.query;
-
-  if (event) {
-    console.log({ fB_event: event });
-  }
 });
 
 //==============================={Main calls}================================================
